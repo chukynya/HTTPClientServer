@@ -3,20 +3,21 @@
 #include <memory>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <string>
+#include <string_view>
 #include <sys/socket.h>
 class Socket {
 public:
     Socket() = delete;
-    explicit Socket(const std::string& hostname, int port);
+    explicit Socket(std::string_view host,  int port);
     ~Socket();
-    void link();
-    void send();
-    void receive();
+
+    void link() const;
+    void send(std::string_view msg) const;
+    std::string receive() const;
 
 private:
-    const std::string &hostname;
+    std::string hostname{};
     int         portno{};
     int         sockfd{};
 };
-// so the users can do Socket socket{<hostname(str)>, <port(int)>}
-// when the user do socket.connect() -> we do connect to server;

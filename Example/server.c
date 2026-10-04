@@ -2,7 +2,7 @@
    The port number is passed as an argument */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
@@ -63,7 +63,6 @@ void dostuff(int sock)
 {
     char buffer[256];
     bzero(buffer, 256);
-
     ssize_t rwnum = read(sock, buffer, 255);
     if (rwnum < 0)
         error("ERROR reading from socket");

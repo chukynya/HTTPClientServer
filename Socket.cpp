@@ -1,15 +1,16 @@
-#include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "Socket.h"
 
-Socket::Socket(const std::string& host, int port)
+Socket::Socket(std::string_view host, int port)
     : hostname{host}, portno{port}
 {
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -23,15 +24,15 @@ Socket::~Socket()
 }
 
 void
-Socket::link()
+Socket::link() const
 {
     struct hostent *server = gethostbyname(hostname.c_str());
     if(server == nullptr)
         throw std::runtime_error("hostent");
 
     struct sockaddr_in serv_addr {
+        .sin_family     = AF_INET,
         .sin_port       = htons(portno),
-        .sin_addr       = AF_INET,
     };
     std::memcpy(&serv_addr.sin_addr.s_addr,
     server->h_addr_list[0],
@@ -40,25 +41,29 @@ Socket::link()
                (struct sockaddr *) &serv_addr,
                sizeof(serv_addr)) < 0)
         throw std::runtime_error("connect");
+    std::cout << "connected to server " << server->h_name << '\n';
 }
 
 void
-Socket::send()
+Socket::send(std::string_view msg) const
 {
-    std::cout << "Please enter the message: ";
-    std::string buffer{};
-    std::cin >> buffer;
-    int n = write(sockfd, buffer.data(), buffer.size());
+    ssize_t n = write(sockfd,msg.data(), msg.size());
     if (n < 0)
-        throw std::runtime_error("send");
+        throw std::runtime_error("send, parm: msg");
+    std::cout << "sending msg(p:1)..." << '\n';
 }
 
-void
-Socket::receive()
+std::string
+Socket::receive() const
 {
-    std::string buff(1024, '\0');
-    int n = read(sockfd, buff.data(), buff.size());
+    std::string buff{};
+    buff.resize(4096);
+
+    ssize_t n = read(sockfd, buff.data(), buff.size());
+
     if(n < 0)
         throw std::runtime_error("receive");
-    n = read(sockfd, buff.data(), buff.size());
+
+    buff.resize(static_cast<std::size_t>(n));
+    return buff;
 }

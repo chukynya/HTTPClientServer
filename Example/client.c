@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     }
     // bzero((char *) &serv_addr, sizeof(serv_addr));
     struct sockaddr_in serv_addr = {
-        .sin_addr       = AF_INET,
+        .sin_family     = AF_INET,
         .sin_port       = htons(portno)
     };
     bcopy((char *)server->h_addr_list[0], 
