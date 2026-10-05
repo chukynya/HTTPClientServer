@@ -2,20 +2,26 @@
 #include <iostream>
 #include <string>
 #include <sys/socket.h>
-#include"Socket.h"
+#include <utility>
+#include "Http.h"
+#include "Socket.h"
 int main(int argc, char *argv[])
 {
     if (argc < 3) {
         std::cerr << "usage ./" << argv[0] << " hostname port\n";
         return 1;
     }
-    int portno{std::stoi(argv[2])};
     try {
-        Socket socket{argv[1], portno};
+        Socket socket{argv[1], argv[2]};
         socket.link();
-        socket.send("Hello from C++");
-        std::string msg = socket.receive();
-        std::cout << msg << '\n';
+        socket.send(
+            "GET / HTTP/1.1\r\n"
+            "Host: " + std::string{argv[1]} + "\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        );
+        Http http{std::move(socket.receive())};
+        http();
     } catch (const std::exception& e) {
         std::cerr << "error: " << e.what() << '\n';
     } catch (...) {

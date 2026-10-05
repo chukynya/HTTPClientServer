@@ -10,60 +10,98 @@
 #include <unistd.h>
 #include "Socket.h"
 
-Socket::Socket(std::string_view host, int port)
-    : hostname{host}, portno{port}
+/* 
+ * Prepare socked fd
+ */
+Socket::Socket(std::string_view host, std::string_view port)
+    : hostname{host}, portno{port}, sockfd{-1}
 {
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) 
-        throw std::runtime_error("sockfd error");
 }
 
 Socket::~Socket()
 {
-    close(sockfd);
+    if (sockfd >= 0)
+        close(sockfd);
 }
 
+/*
+ * Resolve hostname and establish a TCP connetion
+ */
 void
-Socket::link() const
+Socket::link()
 {
-    struct hostent *server = gethostbyname(hostname.c_str());
-    if(server == nullptr)
-        throw std::runtime_error("hostent");
-
-    struct sockaddr_in serv_addr {
-        .sin_family     = AF_INET,
-        .sin_port       = htons(portno),
+    struct addrinfo req {
+        .ai_family      = AF_INET,      // IPv4
+        .ai_socktype    = SOCK_STREAM,  // TCP stream sockets
     };
-    std::memcpy(&serv_addr.sin_addr.s_addr,
-    server->h_addr_list[0],
-    server->h_length);
-    if(connect(sockfd,
-               (struct sockaddr *) &serv_addr,
-               sizeof(serv_addr)) < 0)
-        throw std::runtime_error("connect");
-    std::cout << "connected to server " << server->h_name << '\n';
+    struct addrinfo *res{nullptr};
+    int status = getaddrinfo(hostname.c_str(),
+                             portno.c_str(),
+                             &req,
+                             &res);
+    if (status != 0)
+        throw std::runtime_error("getaddrinfo error: ");
+
+    /*
+     * Loop through results and try to
+     * connect to the first availableaddress   
+     */
+    for (struct addrinfo *p{res}; p != nullptr; p = p->ai_next) {
+        int sock = socket(p->ai_family,
+                          p->ai_socktype,
+                          p->ai_protocol);
+        if(sock == -1)
+            continue;
+        if(connect(sock,
+                   p->ai_addr,
+                   p->ai_addrlen) == 0) {
+            sockfd = sock;
+            break;
+        }
+        close(sock);
+    }
+    freeaddrinfo(res);
+    if(sockfd < 0)
+        throw std::runtime_error("Failed to connect to host");
 }
 
 void
 Socket::send(std::string_view msg) const
 {
-    ssize_t n = write(sockfd,msg.data(), msg.size());
-    if (n < 0)
-        throw std::runtime_error("send, parm: msg");
-    std::cout << "sending msg(p:1)..." << '\n';
+    std::size_t total_send{0};
+    while (total_send < msg.size()) {
+        ssize_t n = write(sockfd,
+                          msg.data() + total_send,
+                          msg.size() - total_send);
+        if (n < 0)
+            throw std::runtime_error("send, parm: msg");
+        total_send += static_cast<std::size_t>(n);
+        std::cout << "sending msg(p:1)..." << '\n';
+    }
 }
 
+/* 
+ * Receive bytes from the TCP stream
+ * keep reading until the peer closes the connection
+ */
 std::string
 Socket::receive() const
 {
-    std::string buff{};
-    buff.resize(4096);
+    std::string chunks{};
+    std::string chunk{};
+    chunk.resize(Socket::chunksize);
 
-    ssize_t n = read(sockfd, buff.data(), buff.size());
+    while (true) {
+        ssize_t n = read(sockfd, chunk.data(), chunk.size());
 
-    if(n < 0)
-        throw std::runtime_error("receive");
+        std::cout << "read() returned: " << n << '\n';
 
-    buff.resize(static_cast<std::size_t>(n));
-    return buff;
+        if(n < 0)
+            throw std::runtime_error("receive");
+        if(n == 0)
+            break;
+
+        chunks.append(chunk.data(), static_cast<std::size_t>(n));
+    }
+    return chunks;
 }

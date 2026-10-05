@@ -18,7 +18,19 @@ target_sources(Socket
             Socket.h
 )
 
+add_library(Http)
+target_sources(Http
+    PRIVATE
+        Http.cpp
+
+    PUBLIC
+        FILE_SET HEADERS
+        FILES
+            Http.h
+)
+
 target_link_libraries(Main
     PRIVATE
         Socket
+        Http
 )
